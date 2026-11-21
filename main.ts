@@ -21,11 +21,32 @@
 // stand in for /bot and /output:
 //   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const BOT_DIR = process.env.MAKEFUN_BOT_DIR ?? "/bot";
 const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+
+// The gate reads the video URL from VIDEO.json, so a bad entry must fail
+// loudly here instead of shipping a placeholder or malformed URL.
+const VIDEO_URL = /^https:\/\/www\.tiktok\.com\/@[^/]+\/video\/\d+$/;
+
+let url: string;
+try {
+  const parsed = JSON.parse(readFileSync(join(BOT_DIR, "VIDEO.json"), "utf8"));
+  url = parsed?.url;
+} catch (err) {
+  console.error(
+    `VIDEO.json could not be read from ${BOT_DIR}: ${(err as Error).message}`,
+  );
+  process.exit(1);
+}
+if (typeof url !== "string" || !VIDEO_URL.test(url)) {
+  console.error(
+    `VIDEO.json does not name a real TikTok video URL (expected https://www.tiktok.com/@<handle>/video/<id>): ${JSON.stringify(url)}`,
+  );
+  process.exit(1);
+}
 
 mkdirSync(OUTPUT_DIR, { recursive: true });
 try {
@@ -36,3 +57,4 @@ try {
   );
   process.exit(1);
 }
+console.log(`TikTok video: ${url}`);
